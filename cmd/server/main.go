@@ -1,35 +1,42 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"runemaster/internal/api"
 	"runemaster/internal/config"
 	"runemaster/internal/db"
+	"runemaster/internal/logger"
 )
 
 func main() {
 	cfg, err := config.Load()
 
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("Failed to load config", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
+
+	logger.Init(cfg.Environment)
 
 	dbPool, err := db.Connect(cfg.DatabaseURL)
 
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 	defer dbPool.Close()
 
 	router := api.NewRouter(dbPool)
 
-	log.Printf("Starting server in %s mode on port %s", cfg.Environment, cfg.ServerPort)
+	slog.Info("Starting server",
+		slog.String("mode", cfg.Environment),
+		slog.String("port", cfg.ServerPort),
+	)
 
-	err = http.ListenAndServe(":"+cfg.ServerPort, router)
-
-	if err != nil {
-		log.Fatalf("Server error: %v", err)
+	if err := http.ListenAndServe(":"+cfg.ServerPort, router); err != nil {
+		slog.Error("Server error", slog.String("error", err.Error()))
 	}
 }
